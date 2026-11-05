@@ -1,0 +1,55 @@
+
+workflows:
+  buzzer-companion-ios:
+    name: Buzzer Companion iOS (unsigned)
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      node: 22.11.0
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Install dependencies
+        script: npm install
+
+      - name: Generate iOS project
+        script: npx expo prebuild --platform ios --non-interactive
+
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
+
+      - name: Build unsigned iOS app
+        script: |
+          set -e
+
+          WORKSPACE="$(find ios -maxdepth 2 -name '*.xcworkspace' -print -quit)"
+
+          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["project"]["schemes"][0])')"
+
+          xcodebuild \
+            -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$CM_BUILD_DIR/build/ios" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        script: |
+          set -e
+
+          APP_PATH="$(find "$CM_BUILD_DIR/build/ios/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -print -quit)"
+
+          mkdir -p "$CM_BUILD_DIR/ipa/Payload"
+          cp -R "$APP_PATH" "$CM_BUILD_DIR/ipa/Payload/"
+          cd "$CM_BUILD_DIR/ipa"
+          zip -r "$CM_BUILD_DIR/Buzzer-Companion-unsigned.ipa" Payload
+
+    artifacts:
+      - Buzzer-Companion-unsigned.ipa
+      - /tmp/xcodebuild_logs/*.log
