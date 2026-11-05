@@ -58,18 +58,26 @@ workflows:
         script: |
           set -e
 
-          APP_PATH="$(find "$CM_BUILD_DIR/build/ios/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -print -quit)"
+          echo "Searching for compiled iOS app..."
+
+          APP_PATH="$(find "$CM_BUILD_DIR/build/ios" -type d -name '*.app' -path '*/Release-iphoneos/*' -print -quit 2>/dev/null || true)"
 
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: Compiled iOS app not found!"
+            echo "Available app bundles:"
+            find "$CM_BUILD_DIR/build/ios" -type d -name '*.app' -print || true
             exit 1
           fi
+
+          echo "Found app: $APP_PATH"
 
           mkdir -p "$CM_BUILD_DIR/ipa/Payload"
           cp -R "$APP_PATH" "$CM_BUILD_DIR/ipa/Payload/"
 
           cd "$CM_BUILD_DIR/ipa"
           zip -r "$CM_BUILD_DIR/Buzzer-Companion-unsigned.ipa" Payload
+
+          echo "Unsigned IPA packaged successfully!"
 
     artifacts:
       - Buzzer-Companion-unsigned.ipa
