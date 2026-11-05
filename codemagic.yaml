@@ -35,15 +35,17 @@ workflows:
 
           echo "Found workspace: $WORKSPACE"
 
-          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; d=json.load(sys.stdin); x=d.get("workspace") or d.get("project") or {}; s=x.get("schemes", []); print(s[0] if s else "")')"
+          echo "Available Xcode schemes:"
+          xcodebuild -list -workspace "$WORKSPACE"
+
+          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; d=json.load(sys.stdin); x=d.get("workspace") or d.get("project") or {}; print("\n".join(x.get("schemes", [])))' | grep -v 'Pods' | head -n 1)"
 
           if [ -z "$SCHEME" ]; then
-            echo "ERROR: No Xcode scheme found!"
-            xcodebuild -list -workspace "$WORKSPACE"
+            echo "ERROR: No application scheme found!"
             exit 1
           fi
 
-          echo "Using scheme: $SCHEME"
+          echo "Building scheme: $SCHEME"
 
           xcodebuild \
             -workspace "$WORKSPACE" \
@@ -54,13 +56,16 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+          echo "Checking compiled app bundles..."
+          find "$CM_BUILD_DIR/build/ios" -type d -name "*.app" -print
+
       - name: Package unsigned IPA
         script: |
           set -e
 
           echo "Searching for compiled iOS app..."
 
-          APP_PATH="$(find "$CM_BUILD_DIR/build/ios" -type d -name '*.app' -path '*/Release-iphoneos/*' -print -quit 2>/dev/null || true)"
+          APP_PATH="$(find "$CM_BUILD_DIR/build/ios" -type d -name '*.app' -path '*/Release-iphoneos/*' -print -quit)"
 
           if [ -z "$APP_PATH" ]; then
             echo "ERROR: Compiled iOS app not found!"
