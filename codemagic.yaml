@@ -6,7 +6,7 @@ workflows:
     instance_type: mac_mini_m2
 
     environment:
-      node: 22.11.0
+      node: 22.13.0
       xcode: latest
       cocoapods: default
 
@@ -15,7 +15,7 @@ workflows:
         script: npm install
 
       - name: Generate iOS project
-        script: npx expo prebuild --platform ios --non-interactive
+        script: CI=1 npx expo prebuild --platform ios
 
       - name: Install CocoaPods
         script: |
@@ -28,7 +28,22 @@ workflows:
 
           WORKSPACE="$(find ios -maxdepth 2 -name '*.xcworkspace' -print -quit)"
 
-          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["project"]["schemes"][0])')"
+          if [ -z "$WORKSPACE" ]; then
+            echo "ERROR: No Xcode workspace found!"
+            exit 1
+          fi
+
+          echo "Found workspace: $WORKSPACE"
+
+          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; d=json.load(sys.stdin); x=d.get("workspace") or d.get("project") or {}; s=x.get("schemes", []); print(s[0] if s else "")')"
+
+          if [ -z "$SCHEME" ]; then
+            echo "ERROR: No Xcode scheme found!"
+            xcodebuild -list -workspace "$WORKSPACE"
+            exit 1
+          fi
+
+          echo "Using scheme: $SCHEME"
 
           xcodebuild \
             -workspace "$WORKSPACE" \
@@ -45,8 +60,14 @@ workflows:
 
           APP_PATH="$(find "$CM_BUILD_DIR/build/ios/Build/Products/Release-iphoneos" -maxdepth 1 -name '*.app' -print -quit)"
 
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: Compiled iOS app not found!"
+            exit 1
+          fi
+
           mkdir -p "$CM_BUILD_DIR/ipa/Payload"
           cp -R "$APP_PATH" "$CM_BUILD_DIR/ipa/Payload/"
+
           cd "$CM_BUILD_DIR/ipa"
           zip -r "$CM_BUILD_DIR/Buzzer-Companion-unsigned.ipa" Payload
 
