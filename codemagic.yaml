@@ -38,10 +38,11 @@ workflows:
           echo "Available Xcode schemes:"
           xcodebuild -list -workspace "$WORKSPACE"
 
-          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; d=json.load(sys.stdin); x=d.get("workspace") or d.get("project") or {}; print("\n".join(x.get("schemes", [])))' | grep -v 'Pods' | head -n 1)"
+          SCHEME="$(xcodebuild -list -json -workspace "$WORKSPACE" | python3 -c 'import json,sys; d=json.load(sys.stdin); x=d.get("workspace") or d.get("project") or {}; print("\n".join(x.get("schemes", [])))' | grep -i 'buzzer' | head -n 1)"
 
           if [ -z "$SCHEME" ]; then
-            echo "ERROR: No application scheme found!"
+            echo "ERROR: No Buzzer Companion scheme found!"
+            echo "Please check the available schemes above."
             exit 1
           fi
 
